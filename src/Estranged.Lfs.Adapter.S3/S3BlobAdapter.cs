@@ -19,7 +19,7 @@ namespace Estranged.Lfs.Adapter.S3
             this.config = config;
         }
 
-        public Uri MakePreSignedUrl(string oid, HttpVerb verb, string mimeType)
+        public Uri MakePreSignedUrl(string oid, HttpVerb verb, string mimeType, long? size = null)
         {
             var request = new GetPreSignedUrlRequest
             {
@@ -30,7 +30,10 @@ namespace Estranged.Lfs.Adapter.S3
                 ContentType = mimeType,
                 Expires = DateTime.UtcNow + config.Expiry
             };
-
+            if (size.HasValue && config.IntelligentTieringMinSize >= 0 && size > config.IntelligentTieringMinSize)
+            {
+                request.Parameters.Add("x-amz-storage-class", "INTELLIGENT_TIERING");
+            }
             return new Uri(client.GetPreSignedURL(request));
         }
 
@@ -62,7 +65,7 @@ namespace Estranged.Lfs.Adapter.S3
         {
             return Task.FromResult(new SignedBlob
             {
-                Uri = MakePreSignedUrl(oid, HttpVerb.PUT, BlobConstants.UploadMimeType),
+                Uri = MakePreSignedUrl(oid, HttpVerb.PUT, BlobConstants.UploadMimeType, size),
                 Expiry = config.Expiry,
                 Headers = new Dictionary<string, string>
                 {
